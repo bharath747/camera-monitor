@@ -79,16 +79,10 @@ jobs:
             "configuration_version": "1"
           }
           JSON
-      - name: Bootstrap Gradle wrapper
-        run: |
-          if [ ! -f ./gradlew ]; then
-            curl -sSL https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o gradle.zip
-            unzip -q gradle.zip
-            ./gradle-9.3.1/bin/gradle wrapper --gradle-version 9.3.1
-            chmod +x ./gradlew
-          fi
       - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '9.3.1'
       - name: Compile only (no APK artifact is published)
-        run: ./gradlew --no-daemon assembleDebug
+        run: gradle --no-daemon assembleDebug
       - name: Explain next step
         run: echo "Compilation check only. Add the real GOOGLE_SERVICES_JSON repository secret to produce a usable APK artifact."
