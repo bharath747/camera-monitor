@@ -13,6 +13,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name=".ViewerActivity" android:exported="false" />
         <service android:name=".CameraMonitorService" android:exported="false" android:foregroundServiceType="camera" />
         <service android:name=".CameraMonitorMessagingService" android:exported="false">
             <intent-filter><action android:name="com.google.firebase.MESSAGING_EVENT" /></intent-filter>
