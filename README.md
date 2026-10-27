@@ -31,7 +31,7 @@ Personal Android app for on-demand live camera viewing with no recording. The sa
 
 ## Build APK
 
-After adding `GOOGLE_SERVICES_JSON`, open **Actions → Build Camera Monitor APK → Run workflow**. The APK is uploaded as the artifact `camera-monitor-debug-apk`.
+On each push, GitHub Actions runs a compile-only check if the Firebase secret is missing; it does not publish that placeholder-config APK. After adding `GOOGLE_SERVICES_JSON`, open **Actions → Build Camera Monitor APK → Run workflow**. The usable APK is uploaded as the artifact `camera-monitor-debug-apk`.
 
 ## First-time use
 
