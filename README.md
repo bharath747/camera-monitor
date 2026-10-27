@@ -40,7 +40,7 @@ match /devices/camera-monitor-device {
 }
 
 match /cameraMonitor/live/sessions/{sessionId} {
-  allow get, create, update: if isCameraMonitorUser();
+  allow get, list, create, update: if isCameraMonitorUser();
   match /viewerCandidates/{candidateId} {
     allow get, list, create: if isCameraMonitorUser();
   }
