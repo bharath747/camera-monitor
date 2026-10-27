@@ -9,8 +9,24 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      has_config: ${{ steps.config.outputs.present }}
+    steps:
+      - id: config
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-apk:
+    needs: prepare
+    if: needs.prepare.outputs.has_config == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -21,9 +37,7 @@ jobs:
       - name: Restore Firebase configuration
         env:
           GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
-        run: |
-          test -n "$GOOGLE_SERVICES_JSON" || (echo "Missing repository secret GOOGLE_SERVICES_JSON" && exit 1)
-          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+        run: printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
       - name: Bootstrap Gradle wrapper
         run: |
           if [ ! -f ./gradlew ]; then
@@ -40,3 +54,47 @@ jobs:
           name: camera-monitor-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+  compile-check:
+    needs: prepare
+    if: needs.prepare.outputs.has_config != 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Create temporary Firebase config for compile check only
+        run: |
+          cat > app/google-services.json <<'JSON'
+          {
+            "project_info": {
+              "project_number": "123456789012",
+              "project_id": "family-location-tracker-8e2cd",
+              "storage_bucket": "family-location-tracker-8e2cd.appspot.com"
+            },
+            "client": [{
+              "client_info": {
+                "mobilesdk_app_id": "1:123456789012:android:0000000000000000000000",
+                "android_client_info": { "package_name": "com.bharath.cameramonitor" }
+              },
+              "api_key": [{ "current_key": "AIzaSyDUMMYCONFIGFORCOMPILECHECKONLY000000000" }],
+              "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+            }],
+            "configuration_version": "1"
+          }
+          JSON
+      - name: Bootstrap Gradle wrapper
+        run: |
+          if [ ! -f ./gradlew ]; then
+            curl -sSL https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o gradle.zip
+            unzip -q gradle.zip
+            ./gradle-9.3.1/bin/gradle wrapper --gradle-version 9.3.1
+            chmod +x ./gradlew
+          fi
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Compile only (no APK artifact is published)
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Explain next step
+        run: echo "Compilation check only. Add the real GOOGLE_SERVICES_JSON repository secret to produce a usable APK artifact."
