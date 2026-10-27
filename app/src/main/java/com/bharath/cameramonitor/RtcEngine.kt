@@ -245,8 +245,15 @@ object RtcEngine {
                 val track = receiver?.track() as? VideoTrack
                 if (track != null && renderer != null) track.addSink(renderer)
             }
+            override fun onTrack(transceiver: RtpTransceiver?) {
+                val track = transceiver?.receiver?.track() as? VideoTrack
+                if (track != null && renderer != null) track.addSink(renderer)
+            }
         }
-        return factory?.createPeerConnection(iceServers, observer)
+        val configuration = PeerConnection.RTCConfiguration(iceServers).apply {
+            sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+        }
+        return factory?.createPeerConnection(configuration, observer)
     }
 
     private fun setRemote(pc: PeerConnection, description: SessionDescription, onStatus: (String) -> Unit) {
