@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
             runCatching { FirebaseAuth.getInstance().signInAnonymously().await() }
                 .onSuccess {
                     CommandRepository.refreshFcmToken { error ->
-                        runOnUiThread { status.text = error ?: "Firebase connected." }
+                        runOnUiThread { status.text = error ?: ("Firebase connected. UID: " + (FirebaseAuth.getInstance().currentUser?.uid ?: "unknown") + "\nUse this UID in the Firestore allowlist.") }
                     }
                 }
                 .onFailure { runOnUiThread { status.text = "Firebase setup error: " + it.message } }
