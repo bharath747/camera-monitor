@@ -2,7 +2,7 @@ package com.bharath.cameramonitor
 
 import android.content.Context
 import org.webrtc.Camera2Enumerator
-import org.webrtc.CameraVideoCapturer
+import org.webrtc.VideoCapturer
 import org.webrtc.DefaultVideoDecoderFactory
 import org.webrtc.DefaultVideoEncoderFactory
 import org.webrtc.EglBase
@@ -37,7 +37,7 @@ object RtcEngine {
     private var peer: PeerConnection? = null
     private var videoSource: VideoSource? = null
     private var videoTrack: VideoTrack? = null
-    private var capturer: CameraVideoCapturer? = null
+    private var capturer: VideoCapturer? = null
     private var textureHelper: SurfaceTextureHelper? = null
     private var activeSession: DocumentReference? = null
     private var sessionQueryListener: ListenerRegistration? = null
@@ -45,6 +45,7 @@ object RtcEngine {
     private var candidateListener: ListenerRegistration? = null
     private var processedSessionId: String? = null
     private var activeViewerRenderer: SurfaceViewRenderer? = null
+    private val pendingCandidates = mutableListOf<Pair<PeerConnection, IceCandidate>>()
 
     @Synchronized
     private fun ensureFactory(context: Context) {
@@ -162,6 +163,7 @@ object RtcEngine {
         val pc = createPeer(context, ref, false, null, onStatus) ?: return
         peer?.close()
         peer = pc
+        activeSession = ref
         videoTrack?.let { pc.addTrack(it, listOf("camera-stream")) }
         candidateListener?.remove()
         candidateListener = ref.collection("viewerCandidates").addSnapshotListener { snap, error ->
@@ -250,7 +252,10 @@ object RtcEngine {
     private fun setRemote(pc: PeerConnection, description: SessionDescription, onStatus: (String) -> Unit) {
         pc.setRemoteDescription(object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
-            override fun onSetSuccess() { onStatus("Remote description set") }
+            override fun onSetSuccess() {
+                    flushCandidates(pc)
+                    onStatus("Remote description set")
+                }
             override fun onCreateFailure(error: String?) { onStatus("Remote description failed: " + error) }
             override fun onSetFailure(error: String?) { onStatus("Remote description failed: " + error) }
         }, description)
@@ -260,10 +265,28 @@ object RtcEngine {
         val mid = data["sdpMid"] as? String
         val line = (data["sdpMLineIndex"] as? Number)?.toInt() ?: 0
         val sdp = data["sdp"] as? String ?: return
-        pc.addIceCandidate(IceCandidate(mid, line, sdp))
+        val candidate = IceCandidate(mid, line, sdp)
+        if (pc.remoteDescription == null) {
+            synchronized(pendingCandidates) { pendingCandidates.add(pc to candidate) }
+        } else {
+            pc.addIceCandidate(candidate)
+        }
+    }
+
+    private fun flushCandidates(pc: PeerConnection) {
+        val ready = synchronized(pendingCandidates) {
+            val matching = pendingCandidates.filter { it.first === pc }.map { it.second }
+            pendingCandidates.removeAll { it.first === pc }
+            matching
+        }
+        ready.forEach { pc.addIceCandidate(it) }
     }
 
     fun stopCamera(onStatus: (String) -> Unit = {}) {
+        activeSession?.update("state", "STOPPED")
+        activeSession = null
+        answerListener?.remove()
+        answerListener = null
         sessionQueryListener?.remove()
         sessionQueryListener = null
         candidateListener?.remove()
@@ -283,6 +306,8 @@ object RtcEngine {
     }
 
     fun stopViewer(onStatus: (String) -> Unit = {}) {
+        activeSession?.update("state", "STOPPED")
+        activeSession = null
         answerListener?.remove()
         answerListener = null
         candidateListener?.remove()
