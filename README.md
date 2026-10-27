@@ -54,7 +54,7 @@ match /cameraMonitor/live/sessions/{sessionId} {
 
 ## Build APK
 
-On each push, GitHub Actions runs a compile-only check if the Firebase secret is missing; it does not publish that placeholder-config APK. After adding `GOOGLE_SERVICES_JSON`, open **Actions → Build Camera Monitor APK → Run workflow**. The usable APK is uploaded as the artifact `camera-monitor-debug-apk`.
+On each push, GitHub Actions always builds and uploads an APK. If `GOOGLE_SERVICES_JSON` is configured, the artifact is `camera-monitor-debug-apk-firebase-configured` and uses the real Firebase app config. If the secret is missing, the artifact is `camera-monitor-debug-apk-placeholder-firebase`; this APK is for installation/UI testing only and cannot connect to Firebase. Add the secret and rerun the workflow to build a functional APK.
 
 ## First-time use
 
