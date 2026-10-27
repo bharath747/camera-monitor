@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import com.google.firebase.firestore.ListenerRegistration
 
 class CameraMonitorService : Service() {
     companion object {
@@ -18,23 +19,67 @@ class CameraMonitorService : Service() {
         private const val NOTIFICATION_ID = 4102
     }
 
+    private var commandListener: ListenerRegistration? = null
+    private val handledCommands = mutableSetOf<String>()
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        startForeground(NOTIFICATION_ID, buildNotification("Remote camera ready"))
+        startForeground(NOTIFICATION_ID, buildNotification("Starting — connecting to Firebase"))
         CommandRepository.refreshFcmToken()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Commands are read directly from Firestore; Cloud Functions/FCM dispatch is not required.
+        ensureCommandListener()
         when (intent?.action) {
-            ACTION_START_LIVE -> RtcEngine.startCamera(this) { updateNotification(it) }
-            ACTION_STOP_LIVE -> RtcEngine.stopCamera { updateNotification(it) }
-            ACTION_PREPARE, null -> updateNotification("Ready — waiting for remote command")
+            ACTION_START_LIVE -> startCamera()
+            ACTION_STOP_LIVE -> stopCamera()
+            ACTION_PREPARE, null -> updateNotification("Ready — listening for live commands")
         }
         return START_STICKY
     }
 
+    private fun ensureCommandListener() {
+        if (commandListener != null) return
+        commandListener = CommandRepository.pendingCommands().addSnapshotListener { snapshot, error ->
+            if (error != null) {
+                updateNotification("Firestore listener error: ${error.message ?: "permission/network error"}")
+                return@addSnapshotListener
+            }
+            snapshot?.documents?.forEach { document ->
+                if (!handledCommands.add(document.id)) return@forEach
+                val action = document.getString("action")?.uppercase()
+                document.reference.update("status", "PROCESSING")
+                    .addOnSuccessListener {
+                        when (action) {
+                            "START_LIVE" -> startCamera()
+                            "STOP_LIVE" -> stopCamera()
+                            else -> document.reference.update(
+                                mapOf("status" to "FAILED", "error" to "Unknown action: $action")
+                            )
+                        }
+                    }
+                    .addOnFailureListener { failure ->
+                        handledCommands.remove(document.id)
+                        updateNotification("Cannot claim command: ${failure.message ?: "Firestore permission denied"}")
+                    }
+            }
+        }
+    }
+
+    private fun startCamera() {
+        updateNotification("Opening camera…")
+        RtcEngine.startCamera(this) { message -> updateNotification(message) }
+    }
+
+    private fun stopCamera() {
+        RtcEngine.stopCamera { updateNotification(it) }
+    }
+
     override fun onDestroy() {
+        commandListener?.remove()
+        commandListener = null
         RtcEngine.stopCamera()
         super.onDestroy()
     }
