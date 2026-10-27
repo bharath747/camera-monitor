@@ -23,11 +23,34 @@ Personal Android app for on-demand live camera viewing with no recording. The sa
 5. In Firebase Authentication, enable the **Anonymous** sign-in provider.
 6. Ensure Cloud Firestore is enabled.
 7. The existing `location-tracker` Cloud Function `dispatchDeviceCommand` must already be deployed. It listens to `devices/{deviceId}/commands/{commandId}` and sends FCM for commands with status `PENDING`. This app registers its FCM token under `devices/camera-monitor-device`.
-8. Add compatible Firestore rules for the new paths without replacing the existing rules. At minimum, authenticated app instances need to read/write:
-   - `devices/camera-monitor-device` and its `commands` subcollection
-   - `cameraMonitor/live/sessions` and the `viewerCandidates` / `cameraCandidates` subcollections within each session
+8. On each phone, open the app once and copy the Firebase UID shown in the status. The camera phone and viewer phone will have different UIDs.
+9. Merge rules like the following into your existing Firestore rules (do not replace the existing rules or open the whole database). Replace both UID placeholders with the two UIDs from your phones:
 
-**Security note:** Anonymous Authentication is convenient for a temporary personal app, but `request.auth != null` alone allows any anonymous user to sign in. Before using this outside a short personal test, restrict these Firestore paths more tightly and consider App Check. Do not open the entire database to public read/write access.
+```javascript
+function isCameraMonitorUser() {
+  return request.auth != null
+    && request.auth.uid in ['CAMERA_PHONE_UID', 'VIEWER_PHONE_UID'];
+}
+
+match /devices/camera-monitor-device {
+  allow get, create, update: if isCameraMonitorUser();
+  match /commands/{commandId} {
+    allow create, get: if isCameraMonitorUser();
+  }
+}
+
+match /cameraMonitor/live/sessions/{sessionId} {
+  allow get, create, update: if isCameraMonitorUser();
+  match /viewerCandidates/{candidateId} {
+    allow get, list, create: if isCameraMonitorUser();
+  }
+  match /cameraCandidates/{candidateId} {
+    allow get, list, create: if isCameraMonitorUser();
+  }
+}
+```
+
+**Security note:** Anonymous Authentication is convenient for a temporary personal app, but do not use a blanket `request.auth != null` rule because anyone can sign in anonymously. Restrict these paths to your two device UIDs as above. If you uninstall/reinstall or clear app data, an anonymous UID can change and the allowlist must be updated.
 
 ## Build APK
 
