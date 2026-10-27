@@ -1,0 +1,42 @@
+name: Build Camera Monitor APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: ${{ secrets.GOOGLE_SERVICES_JSON != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Restore Firebase configuration
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON" || (echo "Missing repository secret GOOGLE_SERVICES_JSON" && exit 1)
+          printf '%s' "$GOOGLE_SERVICES_JSON" > app/google-services.json
+      - name: Bootstrap Gradle wrapper
+        run: |
+          if [ ! -f ./gradlew ]; then
+            curl -sSL https://services.gradle.org/distributions/gradle-9.3.1-bin.zip -o gradle.zip
+            unzip -q gradle.zip
+            ./gradle-9.3.1/bin/gradle wrapper --gradle-version 9.3.1
+            chmod +x ./gradlew
+          fi
+      - uses: gradle/actions/setup-gradle@v6
+      - name: Build debug APK
+        run: ./gradlew --no-daemon assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: camera-monitor-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
