@@ -2,6 +2,7 @@ package com.bharath.cameramonitor
 
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.messaging.FirebaseMessaging
 import kotlinx.coroutines.CoroutineScope
@@ -13,6 +14,11 @@ import java.util.UUID
 object CommandRepository {
     const val CAMERA_DEVICE_ID = "camera-monitor-device"
     private val db get() = FirebaseFirestore.getInstance()
+
+    fun pendingCommands(): Query =
+        db.collection("devices").document(CAMERA_DEVICE_ID)
+            .collection("commands")
+            .whereEqualTo("status", "PENDING")
 
     suspend fun registerToken(token: String) {
         db.collection("devices").document(CAMERA_DEVICE_ID).set(
