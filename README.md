@@ -7,7 +7,7 @@ Personal Android app for on-demand live camera viewing with no recording. The sa
 - Android/Kotlin app with a foreground camera service.
 - Firebase project: `family-location-tracker-8e2cd` (the same project used by `location-tracker`).
 - Firestore stores WebRTC signaling only.
-- Firebase Cloud Messaging delivers `START_LIVE` / `STOP_LIVE` commands to the camera phone.
+- The camera phone's foreground service listens directly to Firestore for `START_LIVE` / `STOP_LIVE` commands; Cloud Functions and FCM dispatch are not required.
 - WebRTC sends video peer-to-peer; Firebase does not store video.
 - GitHub Actions builds a debug APK artifact.
 
@@ -22,7 +22,7 @@ Personal Android app for on-demand live camera viewing with no recording. The sa
    - Do not commit `google-services.json` to the repository.
 5. In Firebase Authentication, enable the **Anonymous** sign-in provider.
 6. Ensure Cloud Firestore is enabled.
-7. The existing `location-tracker` Cloud Function `dispatchDeviceCommand` must already be deployed. It listens to `devices/{deviceId}/commands/{commandId}` and sends FCM for commands with status `PENDING`. This app registers its FCM token under `devices/camera-monitor-device`.
+7. No Cloud Function is required for command dispatch. The camera phone must have the foreground Camera Monitor service running so its Firestore listener can receive pending commands. The app still registers its FCM token for diagnostics/compatibility.
 8. On each phone, open the app once and copy the Firebase UID shown in the status. The camera phone and viewer phone will have different UIDs.
 9. Merge rules like the following into your existing Firestore rules (do not replace the existing rules or open the whole database). Replace both UID placeholders with the two UIDs from your phones:
 
@@ -35,7 +35,7 @@ function isCameraMonitorUser() {
 match /devices/camera-monitor-device {
   allow get, create, update: if isCameraMonitorUser();
   match /commands/{commandId} {
-    allow create, get: if isCameraMonitorUser();
+    allow create, get, list, update: if isCameraMonitorUser();
   }
 }
 
