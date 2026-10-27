@@ -1,7 +1,7 @@
 package com.bharath.cameramonitor
 
 import android.Manifest
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -18,7 +18,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private lateinit var status: TextView
     private val permissionLauncher = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         val cameraOk = result[Manifest.permission.CAMERA] == true ||
