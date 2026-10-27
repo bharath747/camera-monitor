@@ -175,6 +175,7 @@ object RtcEngine {
         pc.setRemoteDescription(object : SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {}
             override fun onSetSuccess() {
+                flushCandidates(pc)
                 onStatus("Viewer offer received; creating answer")
                 pc.createAnswer(object : SdpObserver {
                 override fun onCreateSuccess(desc: SessionDescription?) {
