@@ -170,8 +170,11 @@ object RtcEngine {
                 if (change.type.name == "ADDED") addCandidate(pc, change.document.data)
             }
         }
-        setRemote(pc, SessionDescription(SessionDescription.Type.OFFER, sdp)) {
-            pc.createAnswer(object : SdpObserver {
+        pc.setRemoteDescription(object : SdpObserver {
+            override fun onCreateSuccess(p0: SessionDescription?) {}
+            override fun onSetSuccess() {
+                onStatus("Viewer offer received; creating answer")
+                pc.createAnswer(object : SdpObserver {
                 override fun onCreateSuccess(desc: SessionDescription?) {
                     if (desc == null) { onStatus("WebRTC did not create an answer"); return }
                     pc.setLocalDescription(object : SdpObserver {
@@ -190,7 +193,10 @@ object RtcEngine {
                 override fun onCreateFailure(error: String?) { onStatus("Create answer failed: " + error) }
                 override fun onSetFailure(error: String?) { onStatus("Create answer failed: " + error) }
             }, MediaConstraints())
-        }
+            }
+            override fun onCreateFailure(error: String?) { onStatus("Set remote offer failed: " + error) }
+            override fun onSetFailure(error: String?) { onStatus("Set remote offer failed: " + error) }
+        }, SessionDescription(SessionDescription.Type.OFFER, sdp))
     }
 
     private fun createPeer(
